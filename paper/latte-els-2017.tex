@@ -1,0 +1,903 @@
+\documentclass{styles/sig-alternate-05-2015}
+
+\usepackage{proof}
+\usepackage{fancyvrb}
+\usepackage{url}
+\urlstyle{sf}
+
+\usepackage{lplfitch}
+
+\newcommand{\typeterm}{\star}
+\newcommand{\kindterm}{\square}
+
+\newcommand{\fimplies}{\Longrightarrow}
+
+\newcommand{\norm}[1]{\widetilde{#1}}
+
+\DefineVerbatimEnvironment%
+{program}{Verbatim}
+{%
+commandchars=\\\{\},fontsize=\small,fontfamily=courier,%
+codes={\catcode`$=3\catcode`_=8}} %$
+
+\newcommand{\kw}[1]{\textbf{#1}}
+\newcommand{\cmt}[1]{\textit{#1}}
+\newcommand{\code}[1]{\begin{sffamily}{\small #1}\end{sffamily}}
+\newcommand{\mcode}[1]{\textrm{\code{#1}}}
+\newcommand{\mkw}[1]{\textrm{\kw{#1}}}
+\newcommand{\pindent}{\hspace{8pt}\=}
+
+\begin{document}
+
+% Copyright
+%\setcopyright{styles/acmcopyright}
+
+% DOI
+%\doi{10.475/123_4}
+
+% ISBN
+%\isbn{123-4567-24-567/08/06}
+
+%Conference
+\conferenceinfo{ELS '16}{April AA--BB, 2017, Brussels, Beldium}
+
+%\acmPrice{\$15.00}
+
+\title{A Lisp Way to Type Theory and Formal Proofs}
+%\subtitle{(Submitted January 28 2017)}
+
+\numberofauthors{1} %  in this sample file, there are a *total*
+% of EIGHT authors. SIX appear on the 'first-page' (for formatting
+% reasons) and the remaining two appear in the \additionalauthors section.
+%
+\author{
+% You can go ahead and credit any number of authors here,
+% e.g. one 'row of three' or two rows (consisting of one row of three
+% and a second row of one, two or three).
+%
+% The command \alignauthor (no curly braces needed) should
+% precede each author name, affiliation/snail-mail address and
+% e-mail address. Additionally, tag each line of
+% affiliation/address with \affaddr, and tag the
+% e-mail address with \email.
+%
+% 1st. author
+\alignauthor
+Frederic Peschanski\\
+       \affaddr{UPMC Sorbonne Universit\'es -- LIP6}\\
+       \affaddr{4 place Jussieu}\\
+       \affaddr{Paris, France}\\
+       \email{frederic.peschanski@lip6.fr}
+}
+% There's nothing stopping you putting the seventh, eighth, etc.
+% author on the opening page (as the 'third row') but we ask,
+% for aesthetic reasons that you place these 'additional authors'
+% in the \additional authors block, viz.
+\date{xx April 2017}
+% Just remember to make sure that the TOTAL number of authors
+% is the number that will appear on the first page PLUS the
+% number that will appear in the \additionalauthors section.
+
+\maketitle
+\begin{abstract}
+  In this paper we describe the LaTTe proof assistant, a
+  software that promotes the Lisp notation for the formalization of and reasoning about
+  mathematical contents.
+  LaTTe is based on type theory and implemented as a Clojure library with top-level forms for specifying axioms,
+  definitions, theorems and proofs.
+  As a pure library, LaTTe can exploit the advanced interactive coding experience provided by modern
+  development environments. Moreover, LaTTe enables a form of proving in the large by leveraging the Clojar/Maven
+  ecosystem. It also introduces a very simple and concise domain-specific proof language
+  that is deeply rooted in natural deduction proof theory. And when pure logic is not enough, the system
+  allows to take advantage of the host language: a Lisp way to proof automation.
+\end{abstract}
+
+ \begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10003752.10003790</concept_id>
+<concept_desc>Theory of computation~Logic</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003752.10003790.10011740</concept_id>
+<concept_desc>Theory of computation~Type theory</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Theory of computation~Logic}
+\ccsdesc[500]{Theory of computation~Type theory}
+
+%  Use this command to print the description
+%
+\printccsdesc
+
+% We no longer use \terms command
+%\terms{Theory}
+
+\keywords{Logic; Type Theory; Proof Assistant; Clojure}
+
+
+\section{Introduction}
+
+\begin{sloppypar}
+ Proof assistants realize an ancient logician's dream of
+(re)constructing mathematics based on purely mechanical
+principles. Most proof assistants (perhaps with the
+exception of~\cite{harrison-hollight}) are complex
+pieces of software.
+\end{sloppypar}
+One important factor of this
+complexity is that proof
+assistants generally try to mimic the common mathematical
+notation, which is a complex parsing problem that very often
+get in the way of the user. LaTTe, in comparison, totally surrenders to the simplicity (and sheer beauty)
+of a Lisp notation. This is also the case of the ACL2 theorem prover~\cite{acl2:Kaufmann:2000}.
+One immediate gain is that the complex issue of parsing vanishes. It also makes the definitions
+more explicit and less ambiguous than if written
+with more traditional (and highly informal) computerized variants of mathematical notations.
+
+Another important characteristic is that LaTTe is implemented as a library.
+  The activity of doing mathematics is here considered as a form of
+ (rather than an alternative to) programming. We see this
+ as a clear advantage if compared to proof assistants designed as
+ standalone tools such as Isabelle~\cite{isabelle:book} or
+ Coq~\cite{coq}. First, this gives a better separation of concerns,
+ only a small library is to be maintained, rather than a complex tool-chain.
+ Moreover, modern Lisp
+ implementations often come with very advanced tools for interactive
+ programming that enables \emph{live-coding mathematics}\footnote{cf. \url{https://www.youtube.com/watch?v=5YTCY7wm0Nw}}.
+
+ Another important factor of complexity in proof assistants, both for
+ the developers and the users, is the language in which proofs are
+ written.  The LaTTe proof language is from this respect extremely
+ small and simple. It only introduces two constructs: \kw{assume} and
+ \kw{have} with obvious semantics. The language is also arguably less ad-hoc than most other proof
+ languages in that it is deeply rooted in natural deduction proof
+ theory~\cite{natural-deduc:history}. As a summary, LaTTe aims at \emph{minimalism}. It has less
+ features than most other proof assistants and each implemented
+ feature strives for simplicity and concision. We argue, however, that
+ this set of features is already plenty enough for the purpose of
+ formalizing mathematics on a computer.
+
+The outline of the paper is as follows.
+First, in section~\ref{sec:related} LaTTe is introduced from a user
+perspective. The general principles
+underlying the LaTTe kernel are then discussed in section~\ref{sec:latte}.
+In particular, we provide a bidirectional type systems that
+is used in LaTTe to perform both proof/type-checking and type inference.
+Perhaps the most significant feature of LaTTe is the introduction
+of a \emph{domain-specific language} (DSL) for proof scripts. This is
+presented and illustrated with examples in section~\ref{sec:proofscripts}.
+In section~\ref{sec:auto} we discuss the way parts of proofs can be
+automated, the Lisp-way. In section~\ref{sec:discuss}
+we discuss some (non-)features of LaTTe in comparison with other proof assistants.
+
+\section{A Logician's Dream}
+\label{sec:related}
+
+Quoting~\cite{Geuvers2009}, the main functionality of a proof assistant is to:
+
+\begin{itemize}
+\item formalize mathematical contents on a computer
+\item assist in proving theorems about such contents
+\end{itemize}
+
+Mathematical contents, as can be found in textbooks and proof
+assistants, is mostly based on definitions, and statement of axioms and
+theorems. Consider for example the notion of an \emph{injective
+  function} for which every element of the codomain is the image of at most one element of the domain.
+This can be formalized as follows in LaTTe:
+
+\begin{program}
+(\kw{definition} injective
+  \cmt{"An injective function."}
+  [[T $\typeterm$] [U $\typeterm$] [F ($\fimplies$ T U)]] \\
+  (\kw{forall} [x y T] \\
+     ($\fimplies$ (equal U (F x) (F y))
+          (equal T x y))))
+\end{program}
+
+Similarly to the ACL2 theorem prover~\cite{acl2:Kaufmann:2000}, LaTTe uses a Lisp notation (with Clojure extensions and Unicode characters)
+for the definition of mathematical contents. With
+a bit of practice and a good editor, this notation should become a Mathematician's best friend.
+
+After defining some mathematical concepts as definitions, the next step is the statement of theorems.
+An important property of injective functions is stated below.
+
+\begin{program}
+(\textbf{defthm} compose-injective
+  \cmt{"The composition of two injective functions}
+  \cmt{is injective."}
+  [[T $\typeterm$] [U $\typeterm$] [V $\typeterm$] [f ($\fimplies$ U V)] [g [$\fimplies$ T U]]]
+  ($\fimplies$ (injective U V f)
+       (injective T U g)
+       (injective T V ($\lambda$ [x T] (f (g x))))))
+\end{program}
+
+The \kw{defthm} form only declares a theorem.
+In the next step, we must provide a formal proof so that the theorem can be used in
+further developments.
+
+\begin{table}
+\begin{program}
+(\kw{proof} compose-injective
+  :script
+  \textit{;; \textrm{Our hypothesis is that $f$ and $g$ are injective.}}
+  (\kw{assume} [Hf (injective U V f)
+           Hg (injective T U g)]
+    \textit{;; \textrm{We now have to prove that the composition is injective.}}
+    \textit{;; \textrm{For this we consider two arbitrary elements $x$ and $y$}}
+    \textit{;; \textrm{such that $f\circ g(x)=f \circ g(y)$}}
+    (\kw{assume} [x T
+             y T  
+             Hinj (equal V (f (g x)) (f (g y)))] 
+      \textit{;; \textrm{Since $f$ is injective we have: $g(x)=g(y)$.}}
+      (\kw{have} $\langle$a$\rangle$ (equal U (g x) (g y)) 
+            \kw{:by} (Hf (g x) (g y) Hinj))
+      \textit{;; \textrm{And since $g$ is also injective we obtain: $x=y$.}}
+      (\kw{have} $\langle$b$\rangle$ (equal T x y) \kw{:by} (Hg x y $\langle$a$\rangle$))
+      \textit{;; \textrm{Since $x$ and $y$ are arbitrary, $f\circ g$ is thus injective.}}
+      (\kw{\kw{have}} $\langle$c$\rangle$ (injective T V ($\lambda$ [x T] (f (g x)))) 
+            \kw{:discharge} [x y Hinj $\langle$b$\rangle$])) 
+    \textit{;; \textrm{Which is enough to conclude the proof. $\qed$}}
+    (\kw{qed} $\langle$c$\rangle$)))
+    \end{program}
+\caption{\label{tab:proof}A declarative proof script in LaTTe.}
+\end{table}
+
+There are two main families of proof languages. First there is the
+LCF-style tactic languages\footnote{As a historical remark, the first tactic languages
+  for LCF were developed in Lisp. However this lead to the creation of the
+  ML programming language. Modern variants of ML are often used nowadays to implement
+ theorem provers.} as found in e.g. Coq~\cite{coq} or HOL light~\cite{harrison-hollight}.
+This is an imperative formalism that works on a goal-state to conduct the
+proofs. The main drawback of such an approach is that the proofs are
+then very remote from the mathematical practice. Moreover, they cannot be
+understood without interacting with the tool. Proofs do not have a life on their
+ own in such environments. The declarative proof
+languages, such as Isar\footnote{Isar stands for ``Intelligible semi-automated reasoning''.} in Isabelle~\cite{isabelle:book}, on the
+contrary, are designed to be closer to standard ``pencil and paper''
+proofs.  In LaTTe a proof can be written in two ways: either by
+supplying a lambda-term (as explained in the next section), or more
+interestingly using a declarative proof script. The language for proof
+scripts is probably the most distinctive feature of LaTTe. It is
+described more thoroughly in section~\ref{sec:proofscripts}, but we
+illustrate its use by the proof of the theorem
+\code{compose-injective}, given in Table~\ref{tab:proof}.  One
+ important characteristic of this proof is that the formal arguments
+(in Lisp forms) are in close correspondence with the informal proof
+steps (in comments). An important difference with a
+proof language such as Isar is of simplicity: only two
+constructs are introduced: \kw{assume} and \kw{have}. And the underlying proof theory
+is just standard natural deduction~\cite{natural-deduc:history}.
+
+\section{Lambda the ultimate}
+  \label{sec:latte}
+
+The kernel of the LaTTe library is a computerized version of a
+simple, although very expressive lambda-calculus. It is a variant
+of $\lambda D$ as described in the book~\cite{book:type-theory2014}, which
+corresponds to the \emph{calculus of constructions}~\cite{coc88} (without the prop/type distinction) enriched
+ with definitional features.
+
+\subsection{Syntax}
+
+ \begin{table}
+\begin{program}
+(\kw{definition} $D$ \cmt{"$\langle$doc$\rangle$"}\\
+  [[$x_1$ $t_1$] $\ldots$ [$x_n$ $t_n$]]
+  $\langle$term$\rangle$)
+\end{program}
+
+\begin{tabular}{lllll}
+   \code{$\langle$term$\rangle$} & $t,u$ & ::= & $\kindterm$ & (kind) \\
+        &       &     & | $\typeterm$ & (type) \\
+        &       &     & | $x$ & (variable) \\
+        &       &     & | $[t~u]$ & (application) \\
+        &       &     & | $(\lambda~[x~t]~u)$ & (abstraction) \\
+        &       &     & | $(\Pi~[x~t]~u)$ & (product)\\
+        &       &     & | $(D~t_1~t_2~\ldots~t_n)$ & (instantiation)
+ \end{tabular}
+
+
+ \caption{\label{tab:syntax}The syntax of the LaTTe calculus}
+ \end{table}
+ 
+ The basic syntax of the LaTTe calculus is given in Table~\ref{tab:syntax}. There are
+ various syntactic sugars that will for some of them be introduced later on, and there
+ is also a \kw{defnotation} mechanism to introduce new notations when needed (e.g. for the
+ existential quantifier, which is a derived principle in type theory). Perhaps
+ the most notable feature of the calculus is that it is compatible with the \emph{extended data notation}\footnote{cf.~\url{https://github.com/edn-format/edn}},
+ i.e. it is a subset of the Clojure language\footnote{This means that the lambda-terms in LaTTe can be quoted in Clojure, and thus used to feed macros.}. As a dependently-typed lambda-calculus,
+ there is no syntactic distinction between terms and types. A type is simply a term whose
+ type is $\typeterm$, called the sort of types. The type of $\typeterm$ itself is a sort called a \emph{kind} and denoted by $\kindterm$\footnote{For the sake of logical consistency, the kind $\kindterm$ has no type, which makes LaTTe an \emph{impredicative} type theory.}.
+ The kernel of any lambda-calculus is formed by the \emph{triptych}: variable occurrences $x,y,\ldots$,
+ function applications $[t~u]$ and abstractions $(\lambda~[x~t]~u)$. The latter expresses a function with an argument $x$ of type
+ $t$ (hence a term of type $\typeterm$) and with term $u$ as body. The type of a lambda-abstraction is called a \emph{product}
+ and is denoted by $(\Pi~[x~t]~u)$. The intended meaning is that of universal quantification: ``for all $x$ of type $t$, it is the case that $u$''.
+ As an example, the term $(\lambda~[A~\typeterm]~(\lambda~[x~A]~x))$ corresponds to a type-generic identity function. Its type is $(\Pi~[A~\typeterm]~(\Pi~[x~A]~A))$.
+ An important syntactic sugar that we will largely exploit is that if in $(\Pi~[x~t]~u)$ the variable $x$ has no free occurrence in the body $u$, then we can rewrite the product as $(\fimplies t~u)$.
+ This can be interpreted ass an arrow type of functions that from inputs of type $t$ yield values of type $u$. Alternatively, and in fact \emph{equivalently} this is the logical proposition that ``$t$ implies $u$''.
+  When such a logical point of view is adopted, the universal quantified symbol $\forall$ can be used instead of the more esoteric $\Pi$.
+ For the type-generic identity function, this finally gives $(\forall~[A~\typeterm]~(\fimplies A~A))$, i.e. for any type (proposition) $A$, it is the case that $A$ implies $A$.
+ This gives a first glimpse of the tight connection between computation and logic in such a typed lambda-calculus, namely the \emph{Curry-Howard correspondence}~\cite{curry-howard:book}.
+
+ Because LaTTe is aimed at \emph{practice} and not only theory, the basic lambda-calculus must be enriched by \emph{definitional principles}.
+ First, parameterized definitions can be introduced using the \kw{definition} form. Then, such definitions can be \emph{instantiated} to produce \emph{unfolded} terms.
+ In LaTTe, parenthesized (and desugared) expressions that do not begin with $\lambda$ or $\Pi$ are considered as instantiations of definitions.
+
+ For example, we can introduce a definition of the type-generic identity function as follows:
+
+ \begin{program}
+ (\kw{definition} identity
+   \cmt{"the identity function"}
+   [[A $\typeterm$][x A]]
+   x)
+ \end{program}
+
+ Then, an expression such as \code{(identity~nat~42)} would be instantiated to $42$ (through $\delta$-reduction, as discussed below).
+ In theory, explicit definitions and instantiations are not required since they can be simulated by lambda-abstractions and applications,
+ but in practice it is very important to give names to mathematical concepts (as it is important to give names to computations using
+  function definitions).
+
+\subsection{Semantics}
+
+The semantics of lambda-calculus generally rely on a rewriting rule named $\beta$-reduction and its application under a context:
+\begin{itemize}
+\item (conversion) $[(\lambda[x~t] u)~v] \xrightarrow{\beta} u\{v/x\}$
+\item (context) if $t\xrightarrow{\beta} t'$ then $C[t] \xrightarrow{\beta} C[t']$, for any \emph{single-hole context} $C$.
+\end{itemize}
+The notation $u\{v/x\}$ means that in the term $u$ all the free occurrences of the variable $x$ must be substituted by the term $v$. For example, we have $[a~[(\lambda~[x]~[b x])~[c~d]]] \xrightarrow{\beta} [a~[b~[c~d]]]$. This is because if we let $t=[(\lambda~[x]~[b x])~[c~d]]$ and $t'=[b~[c~d]]$ then $t\xrightarrow{\beta} t'$ by the conversion rule. And if we define the context $C[X]=[a~X]$ with hole $X$, then $C[t] \xrightarrow{\beta} C[t']$ by the context rule. While $\beta$-reduction seems trivial, it is in fact \emph{not} the case, at least at the implementation level. One difficulty is that lambda-terms must be considered up to $\alpha$-equivalence. For example, $(\lambda~[x~t]~u) \equiv_\alpha (\lambda~[y~t]~u)$ because we do not want to distinguish the lambda-terms based on their bound variables. Reasoning about such issues is in fact not trivial, cf. e.g.~\cite{locally-nameless}. A lambda-calculus aimed at logical reasoning has to fulfill two important requirements:
+\begin{itemize}
+\item \emph{strong normalization}: no lambda-term $t$ yields an infinite sequence of $\beta$-reductions
+\item \emph{confluence}: if $t\xrightarrow{\beta^*} t_1$ and $t\xrightarrow{\beta^*} t_2$ then there exist a term $u$ such that $t_1\xrightarrow{\beta^*} u$ and $t_2\xrightarrow{\beta^*} u$ (up-to $\alpha$-equivalence)\footnote{The notation $t\xrightarrow{\beta^*} t'$ means zero or more $\beta$-reductions from $t$ to $t'$, it is the reflexive and transitive closure of the relation of $\beta$-reduction under context.}
+\end{itemize}
+As a consequence, each lambda-term $t$ possesses a unique \emph{normal form} $\norm{t}$ (up-to $\alpha$-equivalence). Thus, two terms $t_1$ and $t_2$ are $\beta$-equivalent, denoted by $t_1 =_\beta t_2$, iff $\norm{t_1} \equiv_{\alpha} \norm{t_2}$.
+In a proof assistant based on type theory, the $\alpha$-equivalence and $\beta$-reduction relations are not enough, for example to implement the definitional features.
+The LaTTe kernel uses a $\delta$-reduction relation, similar to that of~\cite{book:type-theory2014}, to allow the instantiation of definitions.
+
+If we consider a definition $D$ of the form given in Table~\ref{tab:syntax} then the rules are as follows:
+\begin{itemize}
+\item (instantiation) $(D~t_1~\ldots~t_n) \xrightarrow{\delta} u \{t_1/x_1,\ldots,t_n/x_n\}$
+\item (context) if $t\xrightarrow{\delta} t'$ then $C[t] \xrightarrow{\delta} C[t']$, for any \emph{single-hole context} $C$.
+\end{itemize}
+At the theoretical level, the overlap between $\beta$ and $\delta$-reductions is relatively unsettling but in practice,
+$\beta$-reduction works by copying terms while $\delta$-reduction uses names and references, and is thus much more
+economical. Moreover, in mathematics giving names to definitions and theorems is of primary importance so the issue
+must be addressed with rigour. LaTTe here still roughly follows~\cite{book:type-theory2014}.
+
+LaTTe introduces a further $\sigma$-reduction relation for \kw{defspecial}'s. This is discussed in section~\ref{sec:auto}.
+
+\subsection{Type inference}
+
+\begin{table*}[ht]
+\begin{center}
+
+  \begin{tabular}{ccc}
+    \infer[(type)]{\Gamma;\Delta\vdash \typeterm :> \kindterm}{} &
+
+    \infer[(var)]{\Gamma;\Delta,x::A \vdash x :> A}{\Gamma;\Delta\vdash \norm{A} :: s & s \in \{\typeterm,\kindterm\}} &
+
+    \infer[(prod)]{\Gamma;\Delta \vdash (\Pi~[x~A]~B) :> s_2}{\Gamma;\Delta\vdash A :> s_1 & \Gamma;\Delta,x::A \vdash B :> s_2 & \norm{s_1},\norm{s_2} \in \{\typeterm, \kindterm\}} \\[16pt] 
+  \end{tabular}
+    \begin{tabular}{cc}
+      \infer[(abs)]{\Gamma;\Delta \vdash (\lambda~[x~A]~t) :>  (\Pi~[x~A]~B)}{\Gamma;\Delta,x::A\vdash t :> B & \Gamma;\Delta \vdash (\Pi~[x~A]~B) :> s & \norm{s}\in\{\typeterm, \kindterm\}} &
+
+      \infer[(app)]{\Gamma;\Delta\vdash [t~u] :> B \{u/x\}}{\Gamma;\Delta\vdash t :> (\Pi~[x~A]~B) & \Gamma;\Delta\vdash u :: A} \\[16pt]
+    \end{tabular}
+
+    \begin{tabular}{c}
+
+      \infer[(ref)]{\Gamma;\Delta \vdash (D~u_1~u_2~\ldots~u_m) :> (\Pi~[x_{m+1}~t_{m+1}]~\ldots~(\Pi~[x_{n}~t_{n}]~t \{u_1/x_1,u_2/x_2,\ldots,u_m/x_m\}) \cdots )}
+            {\begin{array}{l}
+                \Gamma[D] :: [x_1~t_1]~[x_2~t_2]~\cdots~[x_n~t_n] \rightarrow t \\
+                \Gamma;\Delta\vdash e_1 :: t_1 \quad \Gamma;\Delta,x_1::t_1\vdash e_2 :: t_2 \quad \cdots \quad
+                \Gamma;\Delta,x_1::t_1,x2::t_2,\ldots,x_{m-1}::t_{m-1} \vdash e_m :: t_m
+                \end{array}}
+
+    \end{tabular}
+
+\end{center}
+
+\caption{\label{tab:typing}Type inference rules}
+\end{table*}
+
+\begin{table*}[ht]
+\begin{program}
+(\kw{defn} type-of-var [def-env ctx x]
+  (\kw{if-let} [ty (ctx-fetch ctx x)] 
+    (\kw{let} [[status sort] (\kw{let} [ty' (norm/normalize def-env ctx ty)] 
+                          (\kw{if} (stx/kind? ty') 
+                            [:ok ty'] 
+                            (type-of-term def-env ctx ty)))] 
+      (\kw{if} (= status :ko) 
+        [:ko \{:msg \cmt{"Cannot calculate type of variable."} :term x :from sort\}]
+        (\kw{if} (stx/sort? sort) 
+           [:ok ty] 
+           [:ko \{:msg \cmt{"Not a correct type (super-type is not a sort)"} :term x :type ty :sort sort\}]))) 
+    [:ko \{:msg \cmt{"No such variable in type context"} :term x\}]))
+
+
+(\kw{example}
+ (type-of-var \{\} '[[bool $\typeterm$] [x bool]] 'x) $\Rightarrow$ '[:ok bool])
+
+(\kw{example}
+ (type-of-var \{\} '[[x bool]] 'x)
+ $\Rightarrow$ '[:ko \{:msg \cmt{"Cannot calculate type of variable."},
+           :term x :from \{:msg \cmt{"No such variable in type context"}, :term bool\}\}])
+\end{program}
+
+\caption{\label{tab:varrule}The Clojure source for the $(var)$ inference rule.}
+\end{table*}
+
+There are three interesting algorithmic problems related to the typing of lambda-terms. First, there is the \emph{type checking} problem. Given a term $t$ and a term $u$, check that $u$ is the type of $t$. In LaTTe this problem occurs given:
+\begin{itemize}
+\item a \emph{definitional environment} $\Gamma$ containing an unorded map of definition names to definitions. For example, if $D$ is a definition then $\Gamma[D(t_1,\ldots,t_n)]$ gives the lambda-term corresponding to the definition contents.
+\item a \emph{context} $\Delta$ containing an ordered list of associations from (bound) variable names to types. If $x$ is a variable in the context, then $\Delta[x]$ is its type.
+\end{itemize}
+
+A term $t$ that has type $u$ in environment $\Gamma$ and context
+$\Delta$ is denoted by: $\Gamma;\Delta\vdash t :: u$.  It is not very
+difficult to show that type checking in LaTTe is decidable. This would
+be a relatively straightforward elaboration for $\lambda D$
+in~\cite{book:type-theory2014}. Suppose that we know only the type
+part. Thus, we have to find a term to replace the question mark in
+$\Gamma;\Delta\vdash ? ::u$. This \emph{term synthesis} problem is not
+decidable in LaTTe and the intuition is that we would then have an
+algorithmic way to automatically find a proof for an arbitrary
+theorem. Term synthesis can still be partially solved in some
+occasions, and it is an interesting approach for proof automation. On
+the other hand, one may want to replace the question mark in the
+following problem: $\Gamma;\Delta\vdash t :: ?$. Now we are looking
+for the type of a given term, which is called the \emph{type
+  inference} problem. LaTTe has been designed so that this problem is
+decidable and can be solved efficiently. If the inferred type of term
+$t$ is $A$, then we write: $\Gamma;\Delta\vdash t :> A$.
+
+Table~\ref{tab:typing} summarizes the type inference rules used in
+LaTTe. Each rule corresponds to a Clojure function, we will take the
+$(var)$ rule as an example. Its implementation is a function
+named \code{type-of-var}, whose complete definition is given in
+Table~\ref{tab:varrule}. For a variable $x$ present in the context
+$\Delta$ (parameter \code{ctx} in the source code) with type $A$, the
+$(var)$ rule first normalizes $A$ (using the \code{norm/normalize}
+function) and compares its type with a sort $\typeterm$ or
+$\kindterm$. This checks that $A$ is effectively a type. In the
+conclusion of the rule, the notation $x :> A$ is to be interpreted as
+``the inferred type for $x$ is $A$''. In the source code, this
+corresponds to the value of the variable \code{ty}. Note that only the
+denormalized version of the type is inferred, which is an important
+memory saving measure. The other rules are connected similarly to a
+rather straightforward Clojure function. One subtlety in the $(app)$
+rule for application is that the operand term $u$ must be checked
+against an inferred type $A$.  It is possible to implement a separate
+type-checker. For one thing, type-checking can be done more
+efficiently than type inference. Moreover, it is a simpler algorithm
+and is useful for separate proof checking. However, there is a large
+overlap between the two algorithms and it is not really worth the
+duplication. Indeed, a type-checking algorithm can be obtained ``for
+free'' using the following fact:
+$$\Gamma;\Delta\vdash t::u \text{ iff } \Gamma;\Delta\vdash t :> v
+\text{ and } v =_\beta u$$ The complete implementation of the type inference
+algorithm is less than 400 lines of commented code,
+and is available on the github
+repository\footnote{cf.\url{https://github.com/latte-central/LaTTe/blob/master/src/latte/kernel/typing.clj}}.
+
+\section{A DSL for proof scripts}
+  \label{sec:proofscripts}
+
+\begin{table}
+\begin{tabular}{llll}
+  $\langle$proof$\rangle$ $P$ & ::= & \code{(\kw{proof} $thm$ :term $t$)} & (direct proof) \\
+  & & | \code{(\kw{proof} $thm$ :script $\rho$)} & (proof script) \\[16pt]
+\end{tabular}
+\begin{tabular}{llll}
+  $\langle$script$\rangle$ $\rho$ & ::= & $\sigma~\rho$ & (proof step $\sigma$) \\
+  & & | \code{(\kw{assume} [$H$ $t$] $\rho$)} & (global assumption) \\
+  & & | \code{(\kw{qed} $t$)} & (proof term $t$) \\[16pt]
+\end{tabular}
+\begin{tabular}{ll}
+  $\langle$step$\rangle$ $\sigma$ ::= \\
+  \phantom{|} \code{(\kw{assume} [$H$ $t$] $\rho$)} & (local assumption) \\
+  | \code{(\kw{have} $\langle a \rangle$ $A$ :by $t$)} & (proof of $A$ with term $t$) \\
+  | \code{(\kw{have} $\langle a \rangle$ $A$ :discharge [$x_1 \cdots x_n~t$])} & (discharge assumptions) \\
+\end{tabular}
+\caption{\label{tab:proof:syntax}The proof language of LaTTe}
+\end{table}
+
+\begin{table*}
+\begin{center}
+
+\begin{tabular}{cc}
+  $\infer[(term)]{\begin{array}{l}
+            \Gamma,thm(x_1::t_1,\ldots,x_n::t_n)\triangleleft ?::P \\
+            \hspace{8pt} \vdash \mcode{(\kw{proof}}~thm~\mcode{:term}~t\mcode{)} \dashv \Gamma,thm\triangleleft t::P
+          \end{array}}{\Gamma;x_1::t_1,\ldots,x_n::t_n \vdash t :: P}$ &
+$\infer[(script)]{\begin{array}{l}
+            \Gamma,thm(x_1::t_1,\ldots,x_n::t_n)\triangleleft ?::P \\
+            \hspace{8pt} \vdash \mcode{(\kw{proof}}~thm~\mcode{:script}~\rho\mcode{)} \dashv \Gamma,thm\triangleleft t::P
+        \end{array}}{\begin{array}{l}
+                       \Gamma;x_1::t_1,\ldots,x_n::t_n \vdash \rho \Rrightarrow t \dashv \Gamma'\\
+                       \Gamma;x_1::t_1,\ldots,x_n::t_n \vdash t :: P
+                     \end{array}}$
+
+  \\[14pt]
+\end{tabular}
+
+\begin{tabular}{ccc}
+  $\infer[(step)]{\Gamma;\Delta \vdash \sigma~\rho \Rrightarrow u \dashv \Gamma''}{\Gamma;\Delta\vdash \sigma \Rrightarrow t \dashv \Gamma'
+  & \Gamma';\Delta \vdash \rho \Rrightarrow u \dashv \Gamma''}$ &
+  $\infer[(glob)]{\Gamma;\Delta \vdash \mcode{(\kw{assume}}~\mcode{[}H~t\mcode{]}~\rho\mcode{)} \Rrightarrow u}
+  {\Gamma;\Delta,H::t \vdash \rho \Rrightarrow u}$ &
+  $\infer[(qed)]{\Gamma;\Delta \vdash \mcode{(\kw{qed}}~t\mcode{)} \Rrightarrow t}{}$ \\[14pt]
+\end{tabular}
+
+
+\begin{tabular}{cc}
+  $\infer[(loc)]{\Gamma;\Delta \vdash \mcode{(\kw{assume}}~\mcode{[}H~t\mcode{]}~\rho\mcode{)} \dashv \Gamma'}
+  {\Gamma;\Delta,H::t \vdash \rho \Rrightarrow u \dashv \Gamma'}$ &
+
+  $\infer[(by)]{\Gamma;\Delta \vdash \mcode{(\kw{have}}~\langle a \rangle~A~\mcode{:by}~t\mcode{)} \dashv \Gamma,\langle a \rangle \triangleleft t::A}
+  {\Gamma;\Delta \vdash t::A}$ \\[14pt]
+\end{tabular}
+
+\begin{tabular}{c}
+  $\infer[(hyp)]{\Gamma;\Delta,x_1::t_1,\ldots,x_n::t_n \vdash \mcode{(\kw{have}}~\langle a \rangle~A~\mcode{:discharge}~\mcode{[}x_1~\cdots~x_n~t\mcode{]}\mcode{)} \dashv \Gamma,\langle a \rangle \triangleleft t'::A}
+  {\Gamma;\Delta \vdash t' :: A & t' \equiv (\lambda~[x_1::t_1]~\cdots~(\lambda~[x_n::t_n]~t) \cdots )}$ \\[14pt]
+\end{tabular}
+
+\end{center}
+\caption{\label{tab:proof:semantics}The semantics of LaTTe proof scripts}
+\end{table*}
+
+\begin{table}
+\fitchprf{\pline[H.]{(P \implies Q) \land (\lnot R \implies \lnot Q)}}{
+  \pline[$\langle$a$\rangle$]{P \implies Q \hspace{10em} \land\textbf{Elim:} H}\\
+  \subproof{\pline[x.]{P}}{
+    \pline[$\langle$b$\rangle$]{Q \hspace{12.5em} \Longrightarrow\textbf{Elim:} \langle{a}\rangle, x}\\ %\langle a\rangle}{x}} \\
+    \pline[$\langle$c$\rangle$]{\lnot R \implies \lnot Q \hspace{8em} \land\textbf{Elim:} H}\\
+    \subproof{\pline[Hr.]{\lnot R}}{
+      \pline[$\langle$d$\rangle$]{\lnot Q \hspace{11em} \Longrightarrow\textbf{Elim:} \langle{c}\rangle, Hr} \\
+      \pline[$\langle$e$\rangle$]{Q \hspace{12em} \textbf{Repeat:} \langle{b}\rangle}
+    }
+    \pline[$\langle$f$\rangle$]{R \hspace{13em} \textbf{Absurd:} Hr}
+    }
+    \pline[$\langle$g$\rangle$]{P \implies R \hspace{10em} \Longrightarrow\textbf{Intro:} x,\langle{f}\rangle}
+  }
+  \caption{\label{tab:fitch}A Fitch-style proof (from~\cite{natural-deduc:history})}
+
+\end{table}
+
+
+The language of mathematical proofs is very literary and remote
+from the formal requirements of a computer system. As discussed
+in~\cite{Geuvers2009}, a proof should be not just a \emph{certificate
+  of truthiness} but also, and perhaps most importantly, an
+\emph{explanation} about the theorem under study. Proof assistants
+that use a tactic language (such as Coq or HOL) do not produce
+readable proofs. To understand the proof, one generally has to replay
+it step-by-step on a computer. A language such Isabelle/Isar
+allows for declarative proof scripts, that with some practice can be
+read and understood like classical proofs on papers. However Isar is
+arguably a complex an rather \emph{ad hoc} language, with only
+informal semantics. The domain specific language (DSL) for declarative
+proof scripts in LaTTe is in comparison very simple. It is an
+implementation, in the context of type theory and LaTTe, of
+\emph{fitch-style} natural deduction
+proofs~\cite{natural-deduc:history}, and is thus deeply rooted in
+logic and proof theory. The syntax of the proof language is very
+concise (cf.~Table~\ref{tab:proof:syntax}) and with simple and formal
+semantics (cf.~Table~\ref{tab:proof:semantics}).
+
+As an illustration, we consider the following proposition:
+$$\phi \equiv ((P \implies Q) \land (\lnot R \implies \lnot Q)) \implies (P \implies R)$$
+A natural deduction proof of $\phi$, said in Fitch-style and adapted
+from~\cite{natural-deduc:history}, is given in
+Table~\ref{tab:fitch}. We will now see how to translate such a
+proof to the LaTTe proof language. Initially, the environment $\Gamma$ contains at least the
+theorem to prove, but without a type, i.e. something of the form:
+$thm(P::\typeterm,Q::\typeterm,R::\typeterm)\triangleleft ? : \phi$. The context $\Delta$ contains the three bindings: $P::\typeterm,Q::\typeterm,R::\typeterm$
+
+The beginning of our LaTTe proof is as follows:
+
+\begin{program}
+(\kw{proof} $thm$ :script
+  (\kw{assume}(H (and ($\Longrightarrow$ P Q)
+                 ($\Longrightarrow$ (not P) (not Q))))
+    \ldots
+\end{program}
+
+According to rule $(glob)$ of Table~\ref{tab:proof:semantics}, the hypothesis $H$ and its type (the stated proposition) is introduced in the context $\Delta$. The term $u$ generated by the body of the \kw{assume} block will be propagated. The first step is as follows:
+
+\begin{program}
+    \ldots \cmt{continuing}
+    (\kw{have} $\langle$a$\rangle$ ($\Longrightarrow$ P Q) :by (p/and-elim-left\% H))
+    \ldots
+\end{program}
+
+The justification \code{(and-elim-left\% H)}
+is a \kw{defspecial} that will be discussed
+  more precisely in the next section. But it is simply a function that takes the proof of
+  a conjunction and generates the proof of the left operand of the conjunction.
+  The result of a \kw{have} step, handled by the rule named $(by)$, is to add a new definition to the environment $\Gamma$ of the
+  form:
+$$\langle a \rangle \triangleleft t :: (\Longrightarrow~P~Q)$$
+
+  with $t$ the left-elimination of assumption $H$. Of course, this only works if the type-checker agrees: each \kw{have} step is checked for correctness.
+
+  Ultimately, each accepted step is recorded as a local theorem recorded in $\Gamma$.
+
+  The hypothesis $x$ of type $P$ is assumed and in the next steps we have:
+
+\begin{program}
+    \ldots \cmt{continuing}
+    (\kw{assume} [x P]
+      (\kw{have} $\langle$b$\rangle$ Q :by ($\langle$a$\rangle$ x))
+      (\kw{have} $\langle$c$\rangle$ ($\Longrightarrow$ (not R) (not Q))
+            :by (p/and-elim-right\% H))
+        \ldots
+\end{program}
+
+Now, still through rule $(by)$ the environment $\Gamma$ is extended with definitions $\langle b \rangle$, obtained by applying $x$ on $\langle a \rangle$, and $\langle c \rangle$, obtained by right-elimination of $H$. For the moment we remain very close to the original Fitch-style proof. In the next step, the objective is to perform a \emph{reductio ab absurdum}. We first state $\lnot R$ and derive a contradiction from it. This gives:
+
+\begin{program}
+        \ldots \cmt{continuing}
+        (\kw{assume} [Hr (not R)]
+          (have $\langle$d$\rangle$ (not Q) :by ($\langle$c$\rangle$ Hr))
+          (have $\langle$e$\rangle$ absurd :by ($\langle$d$\rangle$ $\langle$b$\rangle$))
+          (have $\langle$f1$\rangle$ (not (not R))
+                :discharge [Hr $\langle$e$\rangle$]))
+        \ldots
+\end{program}
+
+In the type theory of LaTTe, the proposition \code{(not P)} corresponds to \code{($\Longrightarrow$ P absurd)}
+with \code{absurd} an type without inhabitant, classically: $(\forall~[A~\typeterm]~A)$. Hence after having
+obtained \code{(not Q)} through step $\langle{c}\rangle$ we obtain step $\langle{e}\rangle$. The \code{:discharge}
+step $\langle{f1}\rangle$ corresponds to the generation of a lambda term of the form: \code{($\lambda$ [Hr (not R)] $\langle$e$\rangle$)}
+   hence a term of type \code{(==> (not R) absurd)}, thus \code{(not (not R))}. Since we discharged the hypothesis \code{Hr} we can close the corresponding \kw{assume} scope\footnote{In the current version of LaTTe the \code{:discharge} steps are performed automatically when closing the \code{assume} blocks. Thus, they do not have to (and in fact cannot) be written by the user.}.
+
+   In the Fitch-style proof at step $\langle{f}\rangle$ we deduce \code{R} by contradiction. This reasoning step can only be performed in classical logic. In fact the proposition \code{($\Longrightarrow$ (not (not R)) R)} is equivalent to the axiom of the excluded middle, and is thus classical in essence. In LaTTe, we must rely on the \code{classic} namespace to perform the corresponding step, as follows.
+
+\begin{program}
+        \ldots \cmt{continuing}
+        (\kw{have} $\langle{f2}\rangle$ R
+              :by ((classic/not-not-impl R) $\langle{f1}\rangle$)
+        \ldots
+ \end{program}
+
+At this point we are able to assert the conclusion of the rule, and finish the proof.
+
+\begin{program}
+        \ldots \cmt{continuing}
+        (\kw{have} <g> (==> P R) :discharge [x $\langle{f2}\rangle$]))
+      (\kw{qed} $\langle{g}\rangle$)))
+\end{program}
+
+The term synthetized at step $\langle{g}\rangle$ is propagated to
+the $(script)$ rule using the rule $(qed)$. Finally, the type-checking
+problem $\langle{g}\rangle :: \phi$ is decided, which leads to the
+acceptation or refutal of the proof. Hence, the natural deduction
+proof script is only to elaborate, step-by-step, a proof candidate.
+Ultimately, the type-checker will decide if the proof is correct
+ or not.
+
+
+\section{Proof automation, the Lisp way}
+\label{sec:auto}
+
+Proof automation is an important part of the proof assistant experience.
+In a semi-automated theorem prover such as ACL2~\cite{acl2:Kaufmann:2000},
+the objective is to minimize the need for interaction with the tool.
+This requires strong restrictions on the logic manipulated by the tool.
+Tactic-based proof assistants often provide complex decision procedures
+implemented as dedicated tactics. In LaTTe, proof automation relies on
+ a less imperative notion of  \emph{special} that we discuss in this section.
+
+In LaTTe proof scripts, each \kw{have} step of the form
+ \code{(\kw{have} $\langle$a$\rangle$ $A$ :by $t$)}
+involves the following chain of events:
+\begin{enumerate}
+\item stating a proposition as a type $A$
+\item finding a candidate term $t$
+\item checking that the term $t$ effectively has type $A$
+\end{enumerate}
+
+In the normal usage, the user needs to perform steps 1 and 2, and 
+LaTTe automatically performs step 3. In some situations, the user can
+benefit from the LaTTe implementation to either state the proposition,
+or even receive help in finding a candidate term.
+
+Given the term $t$, the type inference algorithm of Table~\ref{tab:typing}
+may be used to obtain proposition $A$ automatically. The syntax
+of such a proof state is: \code{(\kw{have} $\langle$a$\rangle$ \_ :by $t$)}.
+In many situations, it is not recommended because it may make a proof unintelligible,
+however sometimes this is useful to avoid redundancies in the proofs.
+
+The most interesting situation is the converse: when the proposition $A$ is known but
+it remains to find the candidate term $t$. The term synthesis problem is
+not decidable in general, but it is of course possible to help in the
+finding process.
+
+The LaTTe proof assistant follows the Lisp tradition of allowing users to write extensions of
+the system in the host language itself (namely Clojure). This is the purpose of the \kw{defspecial} form that
+we introduce on a simple example.
+
+The left-elimination rule for conjunction is declared as follows in LaTTe:
+
+\begin{program}
+(\kw{defthm} and-elim-left "..."
+  [[A :type] [B :type]]
+  (==> (\kw{and} A B)
+       A))
+\end{program}
+
+When using this theorem in a \kw{have} step, one needs to provide
+the types \code{A} and \code{B} as well as a proof of \code{(and A B)},
+i.e. something of the form:
+
+\begin{program}
+(\kw{have} $\langle$a$\rangle$ A :by ((and-elim-left A B) p))
+\end{program}
+
+with \code{p} a term of type \code{(and A B)}. But if \code{p} has a conjunction
+type, then it seems redundant having to state propositions \code{A} and \code{B} explicitely.
+This is where we introduce a special rule \code{and-elim-left\%} as follows. 
+
+\begin{program}
+(\kw{defspecial} and-elim-left% "..."
+  [def-env ctx and-term]
+  (\kw{let} [[status ty]
+             (type-of-term def-env ctx and-term)]
+    (\kw{if} (= status :ko)
+      (\kw{throw} (ex-info \cmt{"Cannot type term."} ...))
+      (let [[status A B]
+            (decompose-and-type def-env ctx ty)]
+         (if (= status :ko)
+           (\kw{throw} (ex-info \cmt{"Not an `and`-type."} ...))
+           [(\kw{list} #'and-elim-left A B) and-term])))))
+\end{program}
+
+A \kw{defspecial} is similar to a regular Clojure function, except that it may
+only be called during a \kw{have} proof step. It receives as arguments the
+current environment and context as well as the argument calls. In the case of the
+left elimination rule, only one supplementary argument is passed to the special: the
+term whose type must be a conjunction (parameter \code{and-term} in the code above).
+In the first step, the type of the term is calculated using the inference algorithm.
+If a type has been successfully derived, an auxiliary function named
+\code{decompose-and-type} analyzes the type to check if it is a conjunction type.
+If it is the case then the two conjuncts \code{A} and \code{B} are returned. Ultimately,
+a \kw{defspecial} form must either throw an exception or return a synthesized term.
+In our case, the non-special term \code{((and-elim-left A B) and-term)} is returned.
+
+In a proof, the \kw{have} step for left-elimination is now simpler:
+
+\begin{program}
+(\kw{have} $\langle$a$\rangle$ A :by (and-elim-left% p))
+\end{program}
+
+This is only a small example, there are many other use of specials in the LaTTe library.
+
+The \kw{defspecial} form is quite expressive since the computational content of a special
+can exploit the full power of the host language. We might wonder if allowing such computations within
+proofs is safe. Thanks to the ultimate type-checking step, there is no risk of introducing
+any inconsistency using specials. In fact the only ``real'' danger is to introduce an
+infinite loop (or a too costly computation) in the proof process. But then the proof cannot
+be finished so we are still on the safe side of things. For the moment, there is no complex
+decision procedure implemented using \emph{specials} so it is difficult to compare the
+approach with the common tactic-based one.
+
+\section{Discussions}
+  \label{sec:discuss}
+
+In this section we discuss a few common features of proof assistants, and
+the way they are supported (or not) in LaTTe.
+
+\section*{Implicit arguments} Proof assistants such as Coq~\cite{coq} and Agda~\cite{agda}
+allow to make some arguments of definitions \emph{implicit}. The idea is that such arguments
+may be filled automatically using a unification algorithm. The advantage is that the notations
+can thus be simplified, which removes some burden on the user. A first drawback is that
+because higher-order unification is not decidable, it is sometimes required to
+fill the arguments manually. Moreover the implicit arguments may hide some important
+information: it is not because an argument can be synthesized automatically that it
+is not useful in its explicit form. In LaTTe all arguments must be explicit. However, it
+is possible to refine definitions by partial applications. For example, the general equality
+predicate in LaTTe is of the form \code{(equal T x y)}, which states that \code{x} and \code{y}
+of the same type \code{T} are equal. In the arithmetic library\footnote{cf.~\url{https://github.com/latte-central/latte-integers}},
+the equality on integer is defined as follows:
+
+\begin{program}
+(\kw{definition} =
+  \cmt{"The equality on integers."}
+  [[n int] [m int]]
+  (equal int n m))
+  \end{program}
+
+Hence, we can write \code{(= n m)} instead of \code{(equal int n m)} when comparing integers.
+In the next (upcoming) version of LaTTe a more general form of implicit arguments will be supported. Instead of relying
+on a somewhat unpredictable unification algorithm, we will simply allow the user to specify the
+synthesis of arguments as a Clojure function. The following is a definition of an \emph{implicit}:
+
+\begin{program}
+(\kw{defimplicit} equal [[x tx] [y \_]]
+  (list 'equal tx x y))  
+\end{program}
+
+When an expression \code{(equal e1 e2)} is encountered (at typing time), the \emph{implicit} is called
+with \code{x} (resp. \code{y}) bound to \code{e1} (resp. \code{e2}) and \code{tx} (resp. \code{ty}) to its type.
+The body of the \emph{implicit} form simply produces the correct term of arity 3. At the technical level,
+ this feature is very close to the implementation of \emph{specials}.
+
+\section*{Holes in proofs} The proof assistant Agda~\cite{agda} allows to put holes
+(i.e. unification variables) in proof terms, which gives an alternative way to perform
+proofs in a step-wise way. Such a partial proof can be type-checked (assuming the holes have
+the correct type), and suggestions (or even completions) for holes can be provided by a
+synthesis algorithm. For the moment, LaTTe does not integrate such a feature but it is
+planned for the next version of the proof engine. The idea is to reject a proof but return
+possible mappings for the holes.
+
+\section*{Inductives and $\Sigma$-terms} In Coq~\cite{coq} and Agda~\cite{agda} the term languages is
+much more complex than that of LaTTe. In particular \emph{inductives} and $\Sigma$-terms are proposed.
+It is then much easier to introduce inductive types and recursive functions in the assistants. Moreover, this gives
+a way of performing \emph{proofs by (recursive) computation}. The main disadvantage is that the uniqueness of typing
+is lost, and of course the underlying implementation becomes much more complex. Moreover, \emph{universe levels} must be
+introduced because inductives do not seem to deal well with \emph{impredicativity}. In LaTTe we adopt the approach
+of Isabelle~\cite{isabelle} and HOL-light~\cite{harrison-hollight} (among others) of introducing inductive sets and recursion
+as mathematical libraries. Proof automation is then needed to recover a form of proof by computation. In LaTTe we
+just started to implement inductive sets and recursion theorems~\footnote{cf. \url{https://github.com/latte-central/fixed-points}}.
+The next step will be to automate recursive computations using \emph{specials}. The $\Sigma$-types are much
+easier to implement than inductives. They offer a way to encode \emph{subsets}, i.e. a term $\Sigma x:T.P(x)$ is the
+subset of the elements of type $T$ that satisfies the predicate $P$. This is not needed in type theory and LaTTe since such
+a subset can simply be coded by a predicate $(\lambda~[x~T]~(P x))$. We haven't found any strong argument
+in favor of $\Sigma$-types in the literature.
+
+\section*{User interfaces} Most proof assistants are provided with dedicated user interfaces, in general based
+on an extensible editor such as Emacs. An example of such an environment is \emph{Proof general}~\cite{proof-general} that
+is working with Coq and was also working with Isabelle until version 2014. Proof general was also working with
+other proof assistants, but support has been dropped. The major weak points are maintainability and evolvability.
+There is in general much more motivation to work on the kernel of a proof assistant rather than its user interface.
+The user interfaces for proof assistants can be seen as \emph{live-coding environments}. In most Lisps, and of course Clojure,
+ development environments are designed for a thorough live-coding experience. This observation is one
+ of the two reasons why LaTTe was designed as a library and not as a standalone tool. Our experience is that
+ the Clojure coding environments (Emacs/cider, Cursive, Gorilla Repl, etc.) are perfectly suited for proof assistance. In a
+ way LaTTe has a very powerful interactive environment, maintained by rather large communities, and all this for free!
+
+\section*{Proving in the large} The second reason of the design of LaTTe as library is to leverage the \emph{Clojure ecosystem}
+for proving in the large. Mathematical content can be developed as Clojure libraries, using \emph{namespaces} for modularization.
+The mathematical libraries can be very easily deployed using Clojars (and Maven) and then used as dependencies in further
+development. Since all proof forms are macros, the proof checking is performed at compile-time and thus the deployed libraries
+are already checked for correctness. In this way, although LaTTe is not (yet) a very popular proof assistant, its features
+for proving in the large are already much more advanced if compared to all the proof assistants we know of. This is of course
+obtained \emph{for free} thanks to the way Clojure and its ecosystem is (very thoroughly) designed.
+
+%\newpage
+\section{Conclusion and future work}
+
+In this paper we described the LaTTe proof assistant in much details. The ways a dependent type theory might be implemented
+in practice is not very often described in the literature, a notable exception being~\cite{DBLP:journals/fuin/LohMS10}. In this paper, we provide all the key concepts to understand the actual implementation of the LaTTe kernel.
+LaTTe is a minimalist implementation of a proof assistant based on type theory.
+It is not, however, just a toy implementation for demonstration purpose. It has been used, and is used, to formalize
+various theories such as a part of typed set-theory, the foundations of integer arithmetic and some developments about
+fixed points and inductive sets. These are available on the project page\footnote{\url{https://github.com/latte-central}}.
+
+Beyond the formalization of important parts of mathematics (especially the real numbers), we have a few plans concerning
+the implementation itself. The terms manipulated in type theory can become quite large in the case of long proofs.
+This is a rather sparsely studied aspect of type theory, as most of the implementation aspects. We already experimented
+a more efficient term representation, but the performance gains were limited and the price to pay -- giving up the
+internal Lisp representation -- much too high. We also introduced a memoization scheme for the type inference algorithm
+(which is a known bottleneck) but the ratio memory increase vs. CPU gains is not very good. The best way to circumvent
+this performance issues is to split the proof in separately-compiled subproofs. An automatic proof splitting algorithm
+was recently experimented with much higher performance gains. Note, however, that these performance issues only occur at compile-time because this is when the proofs are
+checked for correctness. This has no impact when using the mathematical libraries because they are deployed in compiled form. Most of the other planned features revolve
+around higher-order pattern matching and (inherently partial) unification. One functionality that would then be possible is the
+ notion of proof refinement using holes. This would also enable the development of search algorithms for theorems.
+
+\newpage
+ 
+\bibliographystyle{abbrv}
+\bibliography{biblio}
+
+
+\end{document}
